@@ -19,6 +19,15 @@ type ShortenResult = {
 };
 
 type Ecc = "L" | "M" | "Q" | "H";
+type EccChoice = "auto" | Ecc;
+
+function autoEcc(text: string): Ecc {
+  const len = text.length;
+  if (len <= 40) return "L";
+  if (len <= 80) return "M";
+  if (len <= 160) return "Q";
+  return "H";
+}
 
 function detectUrl(value: string): string | null {
   const trimmed = value.trim();
@@ -56,7 +65,7 @@ export function Shortener() {
   const [error, setError] = useState<string | null>(null);
   const [fg, setFg] = useState(PRESETS[0].fg);
   const [bg, setBg] = useState(PRESETS[0].bg);
-  const [ecc, setEcc] = useState<Ecc>("M");
+  const [eccChoice, setEccChoice] = useState<EccChoice>("auto");
   const [showCustomize, setShowCustomize] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -66,6 +75,8 @@ export function Shortener() {
   const encoded = result ? result.shortUrl : input;
   const debouncedEncoded = useDebounced(encoded, 180);
   const hasContent = debouncedEncoded.trim().length > 0;
+  const resolvedEcc: Ecc =
+    eccChoice === "auto" ? autoEcc(debouncedEncoded) : eccChoice;
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -123,7 +134,7 @@ export function Shortener() {
       width: 1024,
       margin: 2,
       color: { dark: fg, light: bg },
-      errorCorrectionLevel: ecc,
+      errorCorrectionLevel: resolvedEcc,
     });
     const a = document.createElement("a");
     a.href = url;
@@ -246,7 +257,7 @@ export function Shortener() {
       {/* RIGHT — QR preview & its controls */}
       <aside className="lg:col-span-5 lg:pt-2">
         <div className="lg:sticky lg:top-10">
-          <QrStamp text={debouncedEncoded} fg={fg} bg={bg} ecc={ecc} />
+          <QrStamp text={debouncedEncoded} fg={fg} bg={bg} ecc={resolvedEcc} />
 
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
             <button
@@ -322,13 +333,22 @@ export function Shortener() {
                   </span>
                 </Label>
                 <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="chip"
+                    data-active={eccChoice === "auto"}
+                    onClick={() => setEccChoice("auto")}
+                    title="Pick a level based on data length"
+                  >
+                    auto{eccChoice === "auto" ? ` · ${resolvedEcc}` : ""}
+                  </button>
                   {(["L", "M", "Q", "H"] as Ecc[]).map((level) => (
                     <button
                       key={level}
                       type="button"
                       className="chip"
-                      data-active={ecc === level}
-                      onClick={() => setEcc(level)}
+                      data-active={eccChoice === level}
+                      onClick={() => setEccChoice(level)}
                       title={
                         {
                           L: "Low — ~7% recoverable",
