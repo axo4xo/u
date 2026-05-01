@@ -1,4 +1,5 @@
 import { Shortener } from "./shortener";
+import { ThemeToggle } from "./theme-toggle";
 
 export default function Home() {
   return (
@@ -9,10 +10,8 @@ export default function Home() {
             u<span style={{ color: "var(--accent)" }}>.</span>ax4
             <span style={{ color: "var(--accent)" }}>.</span>cz
           </a>
-          <span className="tag">N° 001 · short &amp; sharp</span>
+          <ThemeToggle />
         </header>
-
-        <div className="rule mt-6" />
 
         <Shortener />
 
@@ -20,7 +19,7 @@ export default function Home() {
           <div className="rule mb-4" />
           <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
             <span style={{ color: "var(--ink-soft)" }}>
-              made on a quiet afternoon · cmd + k to focus
+              made by <a href="https://github.com/axo4xo">axo4xo</a>
             </span>
             <span style={{ color: "var(--ink-faint)" }}>
               [A–Z a–z 0–9] · case sensitive

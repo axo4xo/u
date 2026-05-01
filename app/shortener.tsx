@@ -3,11 +3,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
 
+function useDebounced<T>(value: T, delay = 180): T {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return v;
+}
+
 type ShortenResult = {
   slug: string;
   shortUrl: string;
   target: string;
 };
+
+type Ecc = "L" | "M" | "Q" | "H";
 
 function detectUrl(value: string): string | null {
   const trimmed = value.trim();
@@ -25,29 +36,36 @@ function detectUrl(value: string): string | null {
   }
 }
 
-const PRESET_FG = ["#1c1a16", "#c8391c", "#1d4e89", "#2f6b3a"];
-const PRESET_BG = ["#f3ede1", "#ffffff", "#0e0d0a", "#fff7ea"];
+const PRESETS: Array<{ name: string; fg: string; bg: string }> = [
+  { name: "ink", fg: "#1c1a16", bg: "#f3ede1" },
+  { name: "vermilion", fg: "#c8391c", bg: "#f3ede1" },
+  { name: "midnight", fg: "#f3ede1", bg: "#0e0d0a" },
+  { name: "neon", fg: "#e8533a", bg: "#0e0d0a" },
+  { name: "forest", fg: "#2f6b3a", bg: "#fff7ea" },
+  { name: "deep", fg: "#1d4e89", bg: "#ffffff" },
+];
+const PRESET_FG = ["#1c1a16", "#c8391c", "#1d4e89", "#2f6b3a", "#7a3aa1"];
+const PRESET_BG = ["#f3ede1", "#ffffff", "#0e0d0a", "#fff7ea", "#fde8d0"];
 
 export function Shortener() {
   const [input, setInput] = useState("");
   const [customSlug, setCustomSlug] = useState("");
-  const [shortenOn, setShortenOn] = useState(true);
+  const [showSlug, setShowSlug] = useState(false);
   const [result, setResult] = useState<ShortenResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fg, setFg] = useState(PRESET_FG[0]);
-  const [bg, setBg] = useState(PRESET_BG[0]);
+  const [fg, setFg] = useState(PRESETS[0].fg);
+  const [bg, setBg] = useState(PRESETS[0].bg);
+  const [ecc, setEcc] = useState<Ecc>("M");
+  const [showCustomize, setShowCustomize] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const detectedUrl = useMemo(() => detectUrl(input), [input]);
-  const mode: "empty" | "text" | "url" = !input.trim()
-    ? "empty"
-    : detectedUrl
-      ? "url"
-      : "text";
+  const isUrl = detectedUrl !== null;
 
   const encoded = result ? result.shortUrl : input;
-  const willShorten = mode === "url" && shortenOn && !result;
+  const debouncedEncoded = useDebounced(encoded, 180);
+  const hasContent = debouncedEncoded.trim().length > 0;
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -67,7 +85,7 @@ export function Shortener() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [input]);
 
-  async function mint() {
+  async function shorten() {
     if (!detectedUrl) return;
     setSubmitting(true);
     setError(null);
@@ -93,13 +111,31 @@ export function Shortener() {
   function reset() {
     setInput("");
     setCustomSlug("");
+    setShowSlug(false);
     setResult(null);
     setError(null);
     inputRef.current?.focus();
   }
 
+  async function downloadPng() {
+    if (!hasContent) return;
+    const url = await QRCode.toDataURL(debouncedEncoded, {
+      width: 1024,
+      margin: 2,
+      color: { dark: fg, light: bg },
+      errorCorrectionLevel: ecc,
+    });
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "qr.png";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
   return (
-    <section className="grid grid-cols-1 gap-12 pt-10 lg:grid-cols-12 lg:gap-16">
+    <section className="grid grid-cols-1 gap-12 pt-12 lg:grid-cols-12 lg:gap-16">
+      {/* LEFT — URL flow */}
       <div className="lg:col-span-7">
         <h1 className="font-display text-[clamp(2.6rem,7vw,5.5rem)] leading-[0.95]">
           make a <span className="serif-italic">qr</span>.
@@ -107,113 +143,72 @@ export function Shortener() {
           shorten a <span className="serif-italic">link</span>
           <span style={{ color: "var(--accent)" }}>.</span>
         </h1>
-        <p
-          className="mt-5 max-w-md text-sm leading-relaxed"
-          style={{ color: "var(--ink-soft)" }}
-        >
-          Paste anything below. We&rsquo;ll turn it into a QR code on the
-          right. If it looks like a URL, you can also mint a tiny
-          <span className="serif-italic"> u.ax4.cz/&hellip;</span> redirect.
-        </p>
 
-        <div className="mt-10 space-y-3">
-          <div className="flex items-baseline gap-3">
-            <span
-              className="text-[0.7rem] uppercase tracking-[0.22em]"
-              style={{ color: "var(--ink-faint)" }}
-            >
-              {mode === "empty"
-                ? "01 ·  input"
-                : mode === "url"
-                  ? "01 ·  url detected"
-                  : "01 ·  text"}
-            </span>
-            {mode === "url" ? (
-              <span
-                className="text-[0.7rem] uppercase tracking-[0.22em]"
-                style={{ color: "var(--accent)" }}
-              >
-                ↳ shortenable
-              </span>
-            ) : null}
-          </div>
+        <div className="mt-12">
           <input
             ref={inputRef}
             type="text"
             autoFocus
-            placeholder="https://something.long/and/winding  —  or any text"
+            placeholder="paste a link or any text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             className="field-line text-base sm:text-lg"
           />
         </div>
 
-        {mode === "url" && !result ? (
-          <div className="mt-10 rise">
-            <div className="flex items-center justify-between">
-              <span
-                className="text-[0.7rem] uppercase tracking-[0.22em]"
-                style={{ color: "var(--ink-faint)" }}
+        {isUrl && !result ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              shorten();
+            }}
+            className="mt-7 rise"
+          >
+            <div className="flex flex-wrap items-center gap-4">
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={submitting}
               >
-                02 ·  shorten
-              </span>
+                {submitting ? "shortening…" : "shorten this link →"}
+              </button>
               <button
                 type="button"
-                aria-label="Toggle shorten"
-                className="toggle"
-                data-on={shortenOn}
-                onClick={() => setShortenOn((v) => !v)}
-              />
+                className="text-sm underline-offset-4 hover:underline"
+                style={{ color: "var(--ink-soft)" }}
+                onClick={() => setShowSlug((v) => !v)}
+              >
+                {showSlug ? "− random slug" : "+ custom slug"}
+              </button>
             </div>
-
-            {shortenOn ? (
-              <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
-                <label className="block">
-                  <span
-                    className="block text-[0.65rem] uppercase tracking-[0.2em]"
-                    style={{ color: "var(--ink-soft)" }}
-                  >
-                    custom slug · optional · min 4
-                  </span>
-                  <div className="mt-1 flex items-baseline gap-2">
-                    <span
-                      className="font-display text-lg"
-                      style={{ color: "var(--ink-soft)" }}
-                    >
-                      u.ax4.cz/
-                    </span>
-                    <input
-                      type="text"
-                      pattern="[A-Za-z0-9]*"
-                      placeholder="leave blank for random"
-                      value={customSlug}
-                      onChange={(e) => setCustomSlug(e.target.value)}
-                      className="field-line text-base"
-                    />
-                  </div>
-                </label>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={mint}
-                  disabled={submitting}
+            {showSlug ? (
+              <div className="mt-4 max-w-md rise">
+                <div className="flex items-baseline gap-2">
+                  <span style={{ color: "var(--ink-soft)" }}>u.ax4.cz/</span>
+                  <input
+                    type="text"
+                    pattern="[A-Za-z0-9]*"
+                    placeholder="your-slug"
+                    autoFocus
+                    value={customSlug}
+                    onChange={(e) => setCustomSlug(e.target.value)}
+                    className="field-line text-base"
+                  />
+                </div>
+                <p
+                  className="mt-1 text-xs"
+                  style={{ color: "var(--ink-faint)" }}
                 >
-                  {submitting ? "minting…" : "mint ⏎"}
-                </button>
+                  letters & digits, min 4 chars · leave blank for random
+                </p>
               </div>
             ) : null}
-          </div>
+          </form>
         ) : null}
 
         {result ? (
-          <div className="mt-10 rise">
-            <span
-              className="text-[0.7rem] uppercase tracking-[0.22em]"
-              style={{ color: "var(--accent)" }}
-            >
-              ✓ minted
-            </span>
-            <div className="mt-3 flex flex-wrap items-baseline gap-3">
+          <div className="mt-8 rise">
+            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
               <a
                 href={result.shortUrl}
                 target="_blank"
@@ -229,72 +224,141 @@ export function Shortener() {
                 style={{ color: "var(--ink-soft)" }}
                 onClick={reset}
               >
-                + new one
+                start over
               </button>
             </div>
             <p
               className="mt-2 break-all text-xs"
               style={{ color: "var(--ink-faint)" }}
             >
-              ↳ {result.target}
+              → {result.target}
             </p>
           </div>
         ) : null}
 
         {error ? (
-          <p
-            className="mt-6 text-sm rise"
-            style={{ color: "var(--accent)" }}
-          >
+          <p className="mt-6 text-sm rise" style={{ color: "var(--accent)" }}>
             {error}
           </p>
         ) : null}
-
-        <div className="mt-12">
-          <span
-            className="text-[0.7rem] uppercase tracking-[0.22em]"
-            style={{ color: "var(--ink-faint)" }}
-          >
-            03 ·  qr style
-          </span>
-          <div className="mt-3 flex flex-wrap items-center gap-6">
-            <SwatchRow
-              label="ink"
-              value={fg}
-              presets={PRESET_FG}
-              onChange={setFg}
-            />
-            <SwatchRow
-              label="paper"
-              value={bg}
-              presets={PRESET_BG}
-              onChange={setBg}
-            />
-          </div>
-        </div>
       </div>
 
+      {/* RIGHT — QR preview & its controls */}
       <aside className="lg:col-span-5 lg:pt-2">
         <div className="lg:sticky lg:top-10">
-          <QrStamp
-            text={encoded}
-            fg={fg}
-            bg={bg}
-            caption={
-              mode === "empty"
-                ? "—"
-                : willShorten
-                  ? "preview · mint to fix the QR to a short link"
-                  : result
-                    ? "encodes the short link"
-                    : mode === "url"
-                      ? "encodes the URL directly"
-                      : "encodes the text above"
-            }
-          />
+          <QrStamp text={debouncedEncoded} fg={fg} bg={bg} ecc={ecc} />
+
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+            <button
+              type="button"
+              className="disclosure"
+              onClick={() => setShowCustomize((v) => !v)}
+              aria-expanded={showCustomize}
+            >
+              {showCustomize ? "− customize" : "+ customize"}
+            </button>
+            <button
+              type="button"
+              onClick={downloadPng}
+              disabled={!hasContent}
+              className="text-[0.7rem] uppercase tracking-[0.22em] link-underline disabled:opacity-40 disabled:no-underline"
+              style={{ color: "var(--ink)" }}
+            >
+              download png ↓
+            </button>
+          </div>
+
+          {showCustomize ? (
+            <div className="mt-6 space-y-6 rise">
+              <div className="space-y-2">
+                <Label>presets</Label>
+                <div className="flex flex-wrap gap-2">
+                  {PRESETS.map((p) => {
+                    const active = p.fg === fg && p.bg === bg;
+                    return (
+                      <button
+                        key={p.name}
+                        type="button"
+                        onClick={() => {
+                          setFg(p.fg);
+                          setBg(p.bg);
+                        }}
+                        className="chip"
+                        data-active={active}
+                      >
+                        <span
+                          aria-hidden
+                          className="mr-1 inline-block h-2.5 w-2.5"
+                          style={{
+                            background: p.fg,
+                            outline: `2px solid ${p.bg}`,
+                          }}
+                        />
+                        {p.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <SwatchRow
+                label="ink"
+                value={fg}
+                presets={PRESET_FG}
+                onChange={setFg}
+              />
+              <SwatchRow
+                label="paper"
+                value={bg}
+                presets={PRESET_BG}
+                onChange={setBg}
+              />
+
+              <div className="space-y-2">
+                <Label>
+                  density{" "}
+                  <span style={{ color: "var(--ink-faint)" }}>
+                    · error correction
+                  </span>
+                </Label>
+                <div className="flex flex-wrap gap-2">
+                  {(["L", "M", "Q", "H"] as Ecc[]).map((level) => (
+                    <button
+                      key={level}
+                      type="button"
+                      className="chip"
+                      data-active={ecc === level}
+                      onClick={() => setEcc(level)}
+                      title={
+                        {
+                          L: "Low — ~7% recoverable",
+                          M: "Medium — ~15% recoverable",
+                          Q: "Quartile — ~25% recoverable",
+                          H: "High — ~30% recoverable",
+                        }[level]
+                      }
+                    >
+                      {level}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
       </aside>
     </section>
+  );
+}
+
+function Label({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      className="text-[0.65rem] uppercase tracking-[0.22em]"
+      style={{ color: "var(--ink-soft)" }}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -310,13 +374,8 @@ function SwatchRow({
   onChange: (v: string) => void;
 }) {
   return (
-    <div className="flex items-center gap-3">
-      <span
-        className="text-[0.65rem] uppercase tracking-[0.22em]"
-        style={{ color: "var(--ink-soft)" }}
-      >
-        {label}
-      </span>
+    <div className="flex flex-wrap items-center gap-3">
+      <Label>{label}</Label>
       <div className="flex items-center gap-1.5">
         {presets.map((c) => (
           <button
@@ -335,6 +394,7 @@ function SwatchRow({
         <label
           className="swatch grid place-items-center text-[0.6rem]"
           style={{ background: value }}
+          title="Custom color"
         >
           <input
             type="color"
@@ -352,15 +412,14 @@ function QrStamp({
   text,
   fg,
   bg,
-  caption,
+  ecc,
 }: {
   text: string;
   fg: string;
   bg: string;
-  caption: string;
+  ecc: Ecc;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [downloadUrl, setDownloadUrl] = useState("");
   const empty = !text.trim();
 
   useEffect(() => {
@@ -373,60 +432,32 @@ function QrStamp({
         ctx.fillStyle = bg;
         ctx.fillRect(0, 0, 320, 320);
       }
-      setDownloadUrl("");
       return;
     }
     QRCode.toCanvas(canvasRef.current, text, {
       width: 320,
       margin: 1,
       color: { dark: fg, light: bg },
-      errorCorrectionLevel: "M",
+      errorCorrectionLevel: ecc,
     }).catch(() => {});
-    QRCode.toDataURL(text, {
-      width: 1024,
-      margin: 2,
-      color: { dark: fg, light: bg },
-      errorCorrectionLevel: "M",
-    })
-      .then(setDownloadUrl)
-      .catch(() => {});
-  }, [text, fg, bg, empty]);
+  }, [text, fg, bg, ecc, empty]);
 
   return (
-    <div>
-      <div className="qr-frame mx-auto w-fit">
-        <canvas
-          ref={canvasRef}
-          className="block"
-          style={{ background: bg }}
-          aria-label="QR code"
-        />
-        {empty ? (
-          <div
-            className="pointer-events-none absolute inset-0 grid place-items-center text-center"
-            style={{ color: "var(--ink-faint)" }}
-          >
-            <span className="serif-italic text-2xl">awaiting input</span>
-          </div>
-        ) : null}
-      </div>
-      <div className="mt-4 flex items-center justify-between gap-4 px-1">
-        <span
-          className="text-[0.7rem] uppercase tracking-[0.22em]"
-          style={{ color: "var(--ink-soft)" }}
+    <div className="qr-frame mx-auto w-fit">
+      <canvas
+        ref={canvasRef}
+        className="block"
+        style={{ background: bg }}
+        aria-label="QR code"
+      />
+      {empty ? (
+        <div
+          className="pointer-events-none absolute inset-0 grid place-items-center text-center"
+          style={{ color: "var(--ink-faint)" }}
         >
-          {caption}
-        </span>
-        {downloadUrl ? (
-          <a
-            href={downloadUrl}
-            download="qr.png"
-            className="text-[0.7rem] uppercase tracking-[0.22em] link-underline"
-          >
-            png ↓
-          </a>
-        ) : null}
-      </div>
+          <span className="serif-italic text-2xl">your QR appears here</span>
+        </div>
+      ) : null}
     </div>
   );
 }
