@@ -1,0 +1,214 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #f3ede1;
+  --paper-deep: #ebe3d2;
+  --ink: #1c1a16;
+  --ink-soft: #5b554a;
+  --ink-faint: #9b9486;
+  --rule: #1c1a1622;
+  --accent: #c8391c;
+  --accent-soft: #c8391c14;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #14130f;
+    --paper-deep: #1c1a16;
+    --ink: #ece5d4;
+    --ink-soft: #a89f8c;
+    --ink-faint: #5b554a;
+    --rule: #ece5d422;
+    --accent: #e8533a;
+    --accent-soft: #e8533a1f;
+  }
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-deep: var(--paper-deep);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-accent: var(--accent);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+}
+
+html,
+body {
+  background-color: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-feature-settings: "ss01", "cv11";
+  background-image:
+    radial-gradient(1200px 600px at 85% -10%, var(--accent-soft), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, var(--paper-deep), transparent 50%);
+  background-attachment: fixed;
+}
+
+.font-display {
+  font-family: var(--font-display), ui-serif, Georgia, serif;
+  font-feature-settings: "liga", "dlig";
+  letter-spacing: -0.02em;
+}
+
+.serif-italic {
+  font-family: var(--font-display), ui-serif, Georgia, serif;
+  font-style: italic;
+  letter-spacing: -0.01em;
+}
+
+.rule {
+  height: 1px;
+  background: var(--rule);
+}
+
+.field-line {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--ink);
+  border-radius: 0;
+  padding: 0.5rem 0;
+  font: inherit;
+  color: var(--ink);
+  width: 100%;
+  outline: none;
+  transition: border-color 120ms ease;
+}
+
+.field-line::placeholder {
+  color: var(--ink-faint);
+}
+
+.field-line:focus {
+  border-bottom-color: var(--accent);
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--ink);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  background: var(--paper);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.1rem;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 0.78rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  border: 1px solid var(--ink);
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--ink);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.swatch {
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 1px solid var(--ink);
+  cursor: pointer;
+  padding: 0;
+  background: transparent;
+}
+
+.qr-frame {
+  position: relative;
+  padding: 1.25rem;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+
+.qr-frame::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  border: 1px dashed var(--rule);
+  margin: 0.4rem;
+}
+
+.toggle {
+  position: relative;
+  width: 2.4rem;
+  height: 1.1rem;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  cursor: pointer;
+  padding: 0;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.toggle::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: calc(1.1rem - 4px);
+  height: calc(1.1rem - 4px);
+  background: var(--ink);
+  transition: transform 140ms ease, background 140ms ease;
+}
+
+.toggle[data-on="true"]::after {
+  transform: translateX(1.3rem);
+  background: var(--accent);
+}
+
+.link-underline {
+  background-image: linear-gradient(var(--accent), var(--accent));
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+  transition: background-size 200ms ease;
+}
+
+.link-underline:hover {
+  background-size: 100% 2px;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.rise {
+  animation: rise 360ms ease both;
+}

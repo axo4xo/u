@@ -1,0 +1,17 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Link {
+  slug      String   @id
+  target    String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("links")
+}
